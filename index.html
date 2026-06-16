@@ -13,11 +13,11 @@
             --bg-color: #222;
             --body-bg: radial-gradient(circle, #34495e 0%, #2c3e50 100%);
         }
-        body { 
+        html, body {
             margin: 0; padding: 0; overflow: hidden; 
             background: var(--body-bg); 
             font-family: 'Segoe UI', sans-serif; touch-action: none; 
-            position: fixed; width: 100vw !important; height: 100vh !important; 
+            position: fixed; width: 100% !important; height: 100% !important; 
         }
         #app-container { 
             position: relative; 
@@ -138,7 +138,6 @@
 
 <script>
     // --- FIREBASE INTEGRATION SETUP ---
-    // PASTE YOUR COPIED FIREBASE CONFIG VALUES BELOW:
     const firebaseConfig = {
         apiKey: "YOUR_API_KEY",
         authDomain: "YOUR_AUTH_DOMAIN",
@@ -149,9 +148,18 @@
         appId: "YOUR_APP_ID"
     };
 
-    // Initialize Firebase Engine
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    // Safe Engine Loader (Prevents blank freeze if API keys are missing)
+    let db = null;
+    let isFirebaseReady = false;
+    if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            isFirebaseReady = true;
+        } catch(e) {
+            console.error("Firebase init failed:", e);
+        }
+    }
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -216,7 +224,7 @@
 
     function resizeCanvas() {
         canvas.height = window.innerHeight;
-        canvas.width = Math.min(window.innerWidth, canvas.height * 0.6);
+        canvas.width = Math.min(window.innerWidth, window.innerHeight * 0.6);
     }
 
     function saveNickname() {
@@ -432,9 +440,12 @@
         currentAdAction = null;
     }
 
-    // --- Global Realtime Database Leaderboard Logic ---
     function displayGlobalLeaderboard() {
         const boardContainer = document.getElementById('leaderboardContainer');
+        if (!isFirebaseReady) {
+            boardContainer.innerHTML = `<strong>GLOBAL TOP 5 LEADERBOARD</strong><div style="text-align:center; padding-top:10px; color:#aaa;">Local Practice Mode (Database Offline)</div>`;
+            return;
+        }
         
         db.ref('leaderboard').orderByChild('score').limitToLast(5).on('value', (snapshot) => {
             let html = `<strong>GLOBAL TOP 5 LEADERBOARD</strong>`;
@@ -450,24 +461,25 @@
                 html += `<div class="score-entry" style="justify-content: center; color: #aaa; margin-top: 15px;">No global records yet!</div>`;
             } else {
                 elements.forEach((entry, index) => {
-                    const isCurrentPlayer = (entry.name.toLowerCase() === nickname.toLowerCase());
+                    const isCurrentPlayer = (nickname && entry.name && entry.name.toLowerCase() === nickname.toLowerCase());
                     const highlightStyle = isCurrentPlayer ? 'color: var(--primary); font-weight: bold; background: #fdf2e9;' : '';
                     html += `
                         <div class="score-entry" style="${highlightStyle} padding: 4px 2px;">
-                            <span>${index + 1}. ${entry.name.toUpperCase()}</span>
+                            <span>${index + 1}. ${String(entry.name).toUpperCase()}</span>
                             <span>${entry.score} pts</span>
                         </div>`;
                 });
             }
             boardContainer.innerHTML = html;
         }, (error) => {
-            boardContainer.innerHTML = `<strong>GLOBAL TOP 5 LEADERBOARD</strong><div style="color:red; font-size:11px;">Error connection backend.</div>`;
+            boardContainer.innerHTML = `<strong>GLOBAL TOP 5 LEADERBOARD</strong><div style="color:red; font-size:11px;">Error connecting to backend.</div>`;
         });
     }
 
     function sendScoreToFirebase(playerNick, playerFinalScore) {
-        if (!playerNick || playerFinalScore <= 0) return;
+        if (!isFirebaseReady || !playerNick || playerFinalScore <= 0) return;
         
+        // Single separate push request so it does not trigger circular listener exceptions
         db.ref('leaderboard').push({
             name: playerNick,
             score: playerFinalScore,
