@@ -118,7 +118,6 @@
     let player = { x: 60, y: 0, radius: 18, v: 0, g: 0.45, jump: -7.5 };
     let obstacles = [], coinItems = [];
 
-    // Core Data Loading
     const courtThemes = {
         classicWood: { name: "Classic Wood", court: "#e67e22", lines: "rgba(255,255,255,0.5)", bodyBg: "radial-gradient(circle, #34495e 0%, #2c3e50 100%)" },
         neonCyber:  { name: "Neon Cyber", court: "#0d0e15", lines: "#00f0ff", bodyBg: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" },
@@ -373,7 +372,6 @@
             ctx.fillText(o.id, o.x + 15, 30);
         });
 
-        // DRAW COIN DESIGN
         coinItems.forEach(c => {
             ctx.fillStyle = "#f1c40f";
             ctx.beginPath(); ctx.arc(c.x, c.y, 11, 0, Math.PI*2); ctx.fill();
@@ -382,12 +380,25 @@
             ctx.fillText("$", c.x - 4, c.y + 5);
         });
         
+        // DRAW UPDATED BASKETBALL DESIGN
         ctx.fillStyle = ballConfig.primary;
-        ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = ballConfig.seam; 
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = ballConfig.seam;
         ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(player.x - player.radius, player.y); ctx.lineTo(player.x + player.radius, player.y); ctx.stroke();
-        ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.stroke();
+        // Horizontal curve
+        ctx.beginPath();
+        ctx.ellipse(player.x, player.y, player.radius, player.radius * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        // Vertical curve
+        ctx.beginPath();
+        ctx.ellipse(player.x, player.y, player.radius * 0.5, player.radius, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        // Outer circle
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        ctx.stroke();
         
         update(); 
         requestAnimationFrame(render);
