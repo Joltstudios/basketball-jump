@@ -86,7 +86,9 @@
 
     <div id="menu" class="overlay">
         <h2 id="menuTitle" style="margin-top:0; color:#c0392b;">OUT OF BOUNDS!</h2>
+        
         <p style="font-size: 15px; margin: 15px 0;">Your Run: <strong><span id="lastScore">0</span></strong></p>
+        
         <button class="btn-restart" onclick="startGame()">REPLAY</button>
         <button class="btn-shop" onclick="openShop()">🛒 THEME SHOP</button>
         <button class="btn-exit" onclick="fullExit()">EXIT TO MAIN</button>
@@ -112,6 +114,9 @@
     const ctx = canvas.getContext('2d');
     
     let nickname = localStorage.getItem('playerNick') || "";
+    if (localStorage.getItem('coins') === null) {
+        localStorage.setItem('coins', '150');
+    }
     let coins = parseInt(localStorage.getItem('coins')) || 150;
     let highScore = localStorage.getItem('bestScore') || 0;
     let gameActive = false, score = 0, frame = 0, obstacleCount = 0;
@@ -120,18 +125,7 @@
     let player = { x: 60, y: 0, radius: 18, v: 0, g: 0.45, jump: -7.5 };
     let obstacles = [], coinItems = [];
 
-    // --- AUTO-SAVE FUNCTION ---
-    function persistData() {
-        localStorage.setItem('coins', coins);
-        localStorage.setItem('bestScore', highScore);
-        localStorage.setItem('purchasedCourts', JSON.stringify(purchasedCourts));
-        localStorage.setItem('purchasedBalls', JSON.stringify(purchasedBalls));
-        localStorage.setItem('purchasedPillars', JSON.stringify(purchasedPillars));
-        localStorage.setItem('activeCourtKey', activeCourtKey);
-        localStorage.setItem('activeBallKey', activeBallKey);
-        localStorage.setItem('activePillarKey', activePillarKey);
-    }
-
+    // 10 Balanced Court Configurations
     const courtThemes = {
         classicWood: { name: "Classic Wood", court: "#e67e22", lines: "rgba(255,255,255,0.5)", bodyBg: "radial-gradient(circle, #34495e 0%, #2c3e50 100%)" },
         neonCyber:  { name: "Neon Cyber", court: "#0d0e15", lines: "#00f0ff", bodyBg: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" },
@@ -145,6 +139,7 @@
         sunsetCourt:{ name: "Sunset Drive", court: "#ff6f00", lines: "#ffeb3b", bodyBg: "linear-gradient(180deg, #4a148c 0%, #ff6f00 100%)" }
     };
 
+    // 10 Custom Ball Variations
     const ballThemes = {
         orangeSpald: { name: "Spalding Orange", primary: "#d35400", seam: "black" },
         neonPink:    { name: "Cyber Punk Pink", primary: "#ff007f", seam: "#00f0ff" },
@@ -158,6 +153,7 @@
         cosmicBall:  { name: "Star Dust Cosmic", primary: "#311b92", seam: "#ea80fc" }
     };
 
+    // 10 Different Barrier Towers
     const pillarThemes = {
         slateGray:   { name: "Standard Slate", fill: "#34495e", rim: "#e74c3c" },
         cyberGrid:   { name: "Neon Grid Tower", fill: "#1f1f2e", rim: "#00f0ff" },
@@ -183,6 +179,7 @@
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
         applyThemeStyles();
+        
         if (nickname) {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('menu').style.display = 'flex';
@@ -226,9 +223,13 @@
     function getThemeCost(key, tab) {
         if (key === 'classicWood' || key === 'orangeSpald' || key === 'slateGray') return 0;
         let ownedCount = 0;
-        if (tab === 'courts') ownedCount = purchasedCourts.filter(k => k !== 'classicWood').length;
-        else if (tab === 'balls') ownedCount = purchasedBalls.filter(k => k !== 'orangeSpald').length;
-        else ownedCount = purchasedPillars.filter(k => k !== 'slateGray').length;
+        if (tab === 'courts') {
+            ownedCount = purchasedCourts.filter(k => k !== 'classicWood').length;
+        } else if (tab === 'balls') {
+            ownedCount = purchasedBalls.filter(k => k !== 'orangeSpald').length;
+        } else {
+            ownedCount = purchasedPillars.filter(k => k !== 'slateGray').length;
+        }
         return 150 + (ownedCount * 50);
     }
 
@@ -249,9 +250,13 @@
         grid.innerHTML = '';
         
         let targetDatabase, ownedInventory, currentlyEquipped;
-        if (tab === 'courts') { targetDatabase = courtThemes; ownedInventory = purchasedCourts; currentlyEquipped = activeCourtKey; }
-        else if (tab === 'balls') { targetDatabase = ballThemes; ownedInventory = purchasedBalls; currentlyEquipped = activeBallKey; }
-        else { targetDatabase = pillarThemes; ownedInventory = purchasedPillars; currentlyEquipped = activePillarKey; }
+        if (tab === 'courts') {
+            targetDatabase = courtThemes; ownedInventory = purchasedCourts; currentlyEquipped = activeCourtKey;
+        } else if (tab === 'balls') {
+            targetDatabase = ballThemes; ownedInventory = purchasedBalls; currentlyEquipped = activeBallKey;
+        } else {
+            targetDatabase = pillarThemes; ownedInventory = purchasedPillars; currentlyEquipped = activePillarKey;
+        }
 
         Object.keys(targetDatabase).forEach(key => {
             const item = targetDatabase[key];
@@ -259,11 +264,24 @@
             const isActive = currentlyEquipped === key;
             const dynamicCost = getThemeCost(key, tab);
             
-            let actionBtn = isActive ? `<button class="btn-buy" style="background:#2ecc71; color:white;" disabled>EQUIPPED</button>` :
-                           isOwned ? `<button class="btn-buy" style="background:#3498db; color:white;" onclick="equipItem('${key}', '${tab}')">EQUIP</button>` :
-                           `<button class="btn-buy" style="background:#f1c40f; color:#222;" onclick="buyItem('${key}', '${tab}')">💰 ${dynamicCost}</button>`;
+            let actionBtn = '';
+            if (isActive) {
+                actionBtn = `<button class="btn-buy" style="background:#2ecc71; color:white;" disabled>EQUIPPED</button>`;
+            } else if (isOwned) {
+                actionBtn = `<button class="btn-buy" style="background:#3498db; color:white;" onclick="equipItem('${key}', '${tab}')">EQUIP</button>`;
+            } else {
+                actionBtn = `<button class="btn-buy" style="background:#f1c40f; color:#222;" onclick="buyItem('${key}', '${tab}')">💰 ${dynamicCost}</button>`;
+            }
 
-            grid.innerHTML += `<div class="shop-item ${isActive ? 'active' : ''}"><div class="item-info"><div class="item-name">${item.name}</div><div class="item-cost">${isOwned ? 'Unlocked' : 'Custom Skin'}</div></div>${actionBtn}</div>`;
+            grid.innerHTML += `
+                <div class="shop-item ${isActive ? 'active' : ''}">
+                    <div class="item-info">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-cost">${isOwned ? 'Unlocked' : 'Custom Skin'}</div>
+                    </div>
+                    ${actionBtn}
+                </div>
+            `;
         });
     }
 
@@ -271,19 +289,34 @@
         const cost = getThemeCost(key, tab);
         if (coins >= cost) {
             coins -= cost;
-            if (tab === 'courts') { purchasedCourts.push(key); }
-            else if (tab === 'balls') { purchasedBalls.push(key); }
-            else { purchasedPillars.push(key); }
-            persistData();
+            localStorage.setItem('coins', coins);
+            if (tab === 'courts') {
+                purchasedCourts.push(key);
+                localStorage.setItem('purchasedCourts', JSON.stringify(purchasedCourts));
+            } else if (tab === 'balls') {
+                purchasedBalls.push(key);
+                localStorage.setItem('purchasedBalls', JSON.stringify(purchasedBalls));
+            } else {
+                purchasedPillars.push(key);
+                localStorage.setItem('purchasedPillars', JSON.stringify(purchasedPillars));
+            }
             equipItem(key, tab);
-        } else { alert("Not enough coins!"); }
+        } else {
+            alert("Not enough coins! Keep shooting hoops to accumulate score.");
+        }
     }
 
     function equipItem(key, tab) {
-        if (tab === 'courts') { activeCourtKey = key; }
-        else if (tab === 'balls') { activeBallKey = key; }
-        else { activePillarKey = key; }
-        persistData();
+        if (tab === 'courts') {
+            activeCourtKey = key;
+            localStorage.setItem('activeCourtKey', activeCourtKey);
+        } else if (tab === 'balls') {
+            activeBallKey = key;
+            localStorage.setItem('activeBallKey', activeBallKey);
+        } else {
+            activePillarKey = key;
+            localStorage.setItem('activePillarKey', activePillarKey);
+        }
         applyThemeStyles();
         switchShopTab(tab);
     }
@@ -301,7 +334,9 @@
 
     function jump() { if(gameActive) player.v = player.jump; }
     window.addEventListener('mousedown', (e) => { if(e.target.tagName !== 'BUTTON') jump(); });
-    window.addEventListener('touchstart', (e) => { if(gameActive && e.target.tagName !== 'BUTTON') { e.preventDefault(); jump(); } }, {passive: false});
+    window.addEventListener('touchstart', (e) => { 
+        if(gameActive && e.target.tagName !== 'BUTTON') { e.preventDefault(); jump(); } 
+    }, {passive: false});
 
     function drawCourt() {
         const courtStyle = courtThemes[activeCourtKey];
@@ -309,10 +344,40 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.strokeStyle = courtStyle.lines;
         ctx.lineWidth = 3;
+        
         ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
-        ctx.beginPath(); ctx.moveTo(5, canvas.height / 2); ctx.lineTo(canvas.width - 5, canvas.height / 2); ctx.stroke();
-        ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2, 40, 0, Math.PI * 2); ctx.stroke();
-        ctx.beginPath(); ctx.arc(canvas.width / 2, canvas.height / 2, 15, 0, Math.PI * 2); ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(5, canvas.height / 2);
+        ctx.lineTo(canvas.width - 5, canvas.height / 2);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, 40, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height / 2, 15, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.fillStyle = "rgba(255,255,255,0.02)";
+        ctx.fillRect(canvas.width / 4, canvas.height - 140, canvas.width / 2, 135);
+        ctx.strokeRect(canvas.width / 4, canvas.height - 140, canvas.width / 2, 135);
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height - 140, 45, Math.PI, 0);
+        ctx.stroke();
+        
+        ctx.fillRect(canvas.width / 4, 5, canvas.width / 2, 135);
+        ctx.strokeRect(canvas.width / 4, 5, canvas.width / 2, 135);
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, 140, 45, 0, Math.PI);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, 5, canvas.width * 0.45, 0, Math.PI);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, canvas.height - 5, canvas.width * 0.45, Math.PI, 0);
+        ctx.stroke();
     }
 
     function update() {
@@ -341,8 +406,8 @@
             let dx = c.x - player.x, dy = c.y - player.y;
             if (Math.sqrt(dx*dx + dy*dy) < player.radius + 10 && !c.collected) {
                 c.collected = true; coins++; 
+                localStorage.setItem('coins', coins);
                 updateHUD();
-                persistData();
             }
             if (c.x < -20 || c.collected) coinItems.splice(i, 1);
         });
@@ -353,6 +418,7 @@
         drawCourt();
         const ballConfig = ballThemes[activeBallKey];
         const pillarConfig = pillarThemes[activePillarKey];
+        
         obstacles.forEach(o => {
             ctx.fillStyle = pillarConfig.fill;
             ctx.fillRect(o.x, 0, 50, o.h);
@@ -361,22 +427,31 @@
             ctx.lineWidth = 5;
             ctx.beginPath(); ctx.moveTo(o.x - 10, o.h); ctx.lineTo(o.x + 60, o.h); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(o.x - 10, o.h + o.gap); ctx.lineTo(o.x + 60, o.h + o.gap); ctx.stroke();
+            
+            ctx.fillStyle = "white"; ctx.font = "bold 14px Arial";
+            ctx.fillText(o.id, o.x + 15, 30);
         });
+
         ctx.fillStyle = "var(--gold)";
         coinItems.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, 9, 0, Math.PI*2); ctx.fill(); });
+        
         ctx.fillStyle = ballConfig.primary;
         ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = ballConfig.seam; 
         ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(player.x - player.radius, player.y); ctx.lineTo(player.x + player.radius, player.y); ctx.stroke();
         ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.stroke();
+        
         update(); 
         requestAnimationFrame(render);
     }
 
     function endGame() {
         gameActive = false;
-        if (score > highScore) { highScore = score; }
-        persistData();
+        if (score > highScore) { 
+            highScore = score; 
+            localStorage.setItem('bestScore', highScore); 
+        }
         document.getElementById('lastScore').innerText = score;
         document.getElementById('menuTitle').innerText = "OUT OF BOUNDS!";
         document.getElementById('menu').style.display = 'flex';
