@@ -86,9 +86,7 @@
 
     <div id="menu" class="overlay">
         <h2 id="menuTitle" style="margin-top:0; color:#c0392b;">OUT OF BOUNDS!</h2>
-        
         <p style="font-size: 15px; margin: 15px 0;">Your Run: <strong><span id="lastScore">0</span></strong></p>
-        
         <button class="btn-restart" onclick="startGame()">REPLAY</button>
         <button class="btn-shop" onclick="openShop()">🛒 THEME SHOP</button>
         <button class="btn-exit" onclick="fullExit()">EXIT TO MAIN</button>
@@ -116,12 +114,23 @@
     let nickname = localStorage.getItem('playerNick') || "";
     let coins = parseInt(localStorage.getItem('coins')) || 150;
     let highScore = localStorage.getItem('bestScore') || 0;
-    
     let gameActive = false, score = 0, frame = 0, obstacleCount = 0;
     let currentShopTab = 'courts'; 
 
     let player = { x: 60, y: 0, radius: 18, v: 0, g: 0.45, jump: -7.5 };
     let obstacles = [], coinItems = [];
+
+    // --- AUTO-SAVE FUNCTION ---
+    function persistData() {
+        localStorage.setItem('coins', coins);
+        localStorage.setItem('bestScore', highScore);
+        localStorage.setItem('purchasedCourts', JSON.stringify(purchasedCourts));
+        localStorage.setItem('purchasedBalls', JSON.stringify(purchasedBalls));
+        localStorage.setItem('purchasedPillars', JSON.stringify(purchasedPillars));
+        localStorage.setItem('activeCourtKey', activeCourtKey);
+        localStorage.setItem('activeBallKey', activeBallKey);
+        localStorage.setItem('activePillarKey', activePillarKey);
+    }
 
     const courtThemes = {
         classicWood: { name: "Classic Wood", court: "#e67e22", lines: "rgba(255,255,255,0.5)", bodyBg: "radial-gradient(circle, #34495e 0%, #2c3e50 100%)" },
@@ -169,17 +178,6 @@
     let activeCourtKey = localStorage.getItem('activeCourtKey') || 'classicWood';
     let activeBallKey = localStorage.getItem('activeBallKey') || 'orangeSpald';
     let activePillarKey = localStorage.getItem('activePillarKey') || 'slateGray';
-
-    function persistGameData() {
-        const saveObject = {
-            coins, highScore, purchasedCourts, purchasedBalls, purchasedPillars,
-            activeCourtKey, activeBallKey, activePillarKey
-        };
-        const data = JSON.stringify(saveObject);
-        localStorage.setItem('gameSave', data);
-        localStorage.setItem('gameBackup', data);
-        localStorage.setItem('coins', coins);
-    }
 
     function init() {
         resizeCanvas();
@@ -273,21 +271,21 @@
         const cost = getThemeCost(key, tab);
         if (coins >= cost) {
             coins -= cost;
-            if (tab === 'courts') { purchasedCourts.push(key); localStorage.setItem('purchasedCourts', JSON.stringify(purchasedCourts)); }
-            else if (tab === 'balls') { purchasedBalls.push(key); localStorage.setItem('purchasedBalls', JSON.stringify(purchasedBalls)); }
-            else { purchasedPillars.push(key); localStorage.setItem('purchasedPillars', JSON.stringify(purchasedPillars)); }
-            persistGameData();
+            if (tab === 'courts') { purchasedCourts.push(key); }
+            else if (tab === 'balls') { purchasedBalls.push(key); }
+            else { purchasedPillars.push(key); }
+            persistData();
             equipItem(key, tab);
         } else { alert("Not enough coins!"); }
     }
 
     function equipItem(key, tab) {
-        if (tab === 'courts') { activeCourtKey = key; localStorage.setItem('activeCourtKey', activeCourtKey); }
-        else if (tab === 'balls') { activeBallKey = key; localStorage.setItem('activeBallKey', activeBallKey); }
-        else { activePillarKey = key; localStorage.setItem('activePillarKey', activePillarKey); }
+        if (tab === 'courts') { activeCourtKey = key; }
+        else if (tab === 'balls') { activeBallKey = key; }
+        else { activePillarKey = key; }
+        persistData();
         applyThemeStyles();
         switchShopTab(tab);
-        persistGameData();
     }
 
     function closeShop() {
@@ -344,7 +342,7 @@
             if (Math.sqrt(dx*dx + dy*dy) < player.radius + 10 && !c.collected) {
                 c.collected = true; coins++; 
                 updateHUD();
-                persistGameData();
+                persistData();
             }
             if (c.x < -20 || c.collected) coinItems.splice(i, 1);
         });
@@ -377,11 +375,8 @@
 
     function endGame() {
         gameActive = false;
-        if (score > highScore) { 
-            highScore = score; 
-            localStorage.setItem('bestScore', highScore); 
-        }
-        persistGameData();
+        if (score > highScore) { highScore = score; }
+        persistData();
         document.getElementById('lastScore').innerText = score;
         document.getElementById('menuTitle').innerText = "OUT OF BOUNDS!";
         document.getElementById('menu').style.display = 'flex';
