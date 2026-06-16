@@ -59,12 +59,15 @@
         .tab-btn.active { background: #3498db; color: white; }
         
         .shop-grid { display: flex; flex-direction: column; gap: 10px; max-height: 220px; overflow-y: auto; margin: 15px 0; padding-right: 5px; }
-        .shop-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 2px solid #eee; border-radius: 10px; background: #fafafa; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 2px solid #eee; border-radius: 10px; background: #fafafa; gap: 10px; }
         .shop-item.active { border-color: #2ecc71; background: #e8f8f5; }
-        .item-info { text-align: left; }
+        .item-info { text-align: left; flex-grow: 1; }
         .item-name { font-weight: bold; font-size: 14px; }
         .item-cost { font-size: 12px; color: #7f8c8d; }
-        .btn-buy { padding: 6px 12px; font-size: 12px; margin-top: 0; }
+        .btn-buy { padding: 6px 12px; font-size: 12px; margin-top: 0; min-width: 85px; }
+        
+        /* Thumbnail Preview Canvas styling */
+        .preview-canvas { width: 40px; height: 40px; border-radius: 8px; border: 1px solid #ccc; background: #fff; flex-shrink: 0; display: block; }
     </style>
 </head>
 <body>
@@ -113,7 +116,7 @@
     const ctx = canvas.getContext('2d');
     
     let nickname = localStorage.getItem('playerNick') || "";
-    let coins = parseInt(localStorage.getItem('coins')) || 150; // Starting theme coins raised to 150
+    let coins = parseInt(localStorage.getItem('coins')) || 150; 
     let highScore = localStorage.getItem('bestScore') || 0;
     let gameActive = false, score = 0, frame = 0, obstacleCount = 0;
     let currentShopTab = 'courts'; 
@@ -254,6 +257,7 @@
 
             grid.innerHTML += `
                 <div class="shop-item ${isActive ? 'active' : ''}">
+                    <canvas id="preview-${key}" class="preview-canvas" width="80" height="80"></canvas>
                     <div class="item-info">
                         <div class="item-name">${item.name}</div>
                         <div class="item-cost">${isOwned ? 'Unlocked' : 'Custom Skin'}</div>
@@ -261,7 +265,76 @@
                     ${actionBtn}
                 </div>
             `;
+            
+            // Generate visual miniature preview inside row render loop
+            setTimeout(() => {
+                drawThemeThumbnail(key, tab, item);
+            }, 0);
         });
+    }
+
+    // New render helper function to handle thumbnail mockups
+    function drawThemeThumbnail(key, tab, config) {
+        const pCanvas = document.getElementById(`preview-${key}`);
+        if (!pCanvas) return;
+        const pCtx = pCanvas.getContext('2d');
+        const w = pCanvas.width;
+        const h = pCanvas.height;
+        
+        pCtx.clearRect(0, 0, w, h);
+        
+        if (tab === 'courts') {
+            pCtx.fillStyle = config.court;
+            pCtx.fillRect(0, 0, w, h);
+            pCtx.strokeStyle = config.lines;
+            pCtx.lineWidth = 4;
+            pCtx.strokeRect(4, 4, w - 8, h - 8);
+            pCtx.beginPath();
+            pCtx.arc(w / 2, h / 2, 16, 0, Math.PI * 2);
+            pCtx.stroke();
+        } 
+        else if (tab === 'balls') {
+            pCtx.fillStyle = "#fff"; 
+            pCtx.fillRect(0, 0, w, h);
+            
+            let radius = 24;
+            let cx = w / 2;
+            let cy = h / 2;
+            
+            if (config.special === "fire") {
+                for (let i = 0; i < 8; i++) {
+                    pCtx.beginPath();
+                    pCtx.fillStyle = i % 2 === 0 ? "rgba(255, 69, 0, 0.4)" : "rgba(255, 165, 0, 0.3)";
+                    pCtx.arc(cx + (Math.random() - 0.5) * 16, cy + (Math.random() - 0.5) * 16, radius * 1.1, 0, Math.PI * 2);
+                    pCtx.fill();
+                }
+            }
+            
+            pCtx.fillStyle = config.primary;
+            pCtx.beginPath();
+            pCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+            pCtx.fill();
+            pCtx.strokeStyle = config.seam;
+            pCtx.lineWidth = 2;
+            pCtx.beginPath();
+            pCtx.moveTo(cx - radius, cy);
+            pCtx.lineTo(cx + radius, cy);
+            pCtx.stroke();
+            pCtx.beginPath();
+            pCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+            pCtx.stroke();
+        } 
+        else if (tab === 'pillars') {
+            pCtx.fillStyle = "#eee";
+            pCtx.fillRect(0, 0, w, h);
+            
+            pCtx.fillStyle = config.fill;
+            pCtx.fillRect(w / 4, 0, w / 2, h);
+            
+            pCtx.strokeStyle = config.rim;
+            pCtx.lineWidth = 4;
+            pCtx.beginPath(); pCtx.moveTo(w / 4 - 5, h / 2); pCtx.lineTo(3 * w / 4 + 5, h / 2); pCtx.stroke();
+        }
     }
 
     function buyItem(key, tab) {
@@ -414,7 +487,6 @@
         ctx.fillStyle = "var(--gold)";
         coinItems.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, 9, 0, Math.PI*2); ctx.fill(); });
         
-        // Render Fireball Aura effect if equipped
         if (ballConfig.special === "fire") {
             for (let idx = 0; idx < 6; idx++) {
                 ctx.beginPath();
@@ -431,7 +503,7 @@
         ctx.strokeStyle = ballConfig.seam; 
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(player.x - player.radius, player.y); ctx.lineTo(player.x + player.radius, player.y); ctx.stroke();
-        ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); stroke();
         
         update(); 
         requestAnimationFrame(render);
@@ -439,12 +511,10 @@
 
     function endGame() {
         gameActive = false;
-        
         if (score > highScore) { 
             highScore = score; 
             localStorage.setItem('bestScore', highScore); 
         }
-        
         document.getElementById('lastScore').innerText = score;
         document.getElementById('menuTitle').innerText = "OUT OF BOUNDS!";
         document.getElementById('menu').style.display = 'flex';
