@@ -72,13 +72,11 @@
 <div id="app-container">
     <canvas id="gameCanvas"></canvas>
     
-    <!-- HUD Layer -->
     <div id="hud">
         <div id="playerDisplay">PLAYER</div>
         <div>💰 <span id="coinVal">0</span></div>
     </div>
 
-    <!-- Main Entry Screen -->
     <div id="login-screen" class="overlay">
         <h1 style="color:var(--primary); margin:0; font-size: 32px; letter-spacing: -1px;">BASKETBALL JUMP</h1>
         <p style="color: #666; margin-top: 5px;">Enter nickname to play</p>
@@ -86,7 +84,6 @@
         <button class="btn-start" onclick="saveNickname()">START GAME</button>
     </div>
 
-    <!-- Match Menu Screen -->
     <div id="menu" class="overlay">
         <h2 id="menuTitle" style="margin-top:0; color:#c0392b;">OUT OF BOUNDS!</h2>
         
@@ -97,7 +94,6 @@
         <button class="btn-exit" onclick="fullExit()">EXIT TO MAIN</button>
     </div>
 
-    <!-- Shop Screen -->
     <div id="shop-screen" class="overlay">
         <h2 style="margin-top: 0; color: #3498db; margin-bottom: 5px;">THEME SHOP</h2>
         <p style="margin: 0; font-size: 14px; color: #666;">Balance: 💰 <span id="shopCoinVal">0</span></p>
@@ -118,7 +114,6 @@
     const ctx = canvas.getContext('2d');
     
     let nickname = localStorage.getItem('playerNick') || "";
-    // Base startup balance
     if (localStorage.getItem('coins') === null) {
         localStorage.setItem('coins', '150');
     }
@@ -130,29 +125,46 @@
     let player = { x: 60, y: 0, radius: 18, v: 0, g: 0.45, jump: -7.5 };
     let obstacles = [], coinItems = [];
 
+    // 10 Balanced Court Configurations
     const courtThemes = {
         classicWood: { name: "Classic Wood", court: "#e67e22", lines: "rgba(255,255,255,0.5)", bodyBg: "radial-gradient(circle, #34495e 0%, #2c3e50 100%)" },
-        neonCyber: { name: "Neon Cyber", court: "#0d0e15", lines: "#00f0ff", bodyBg: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" },
-        matrixNet: { name: "The Matrix", court: "#000000", lines: "#00FF00", bodyBg: "linear-gradient(180deg, #001100 0%, #000000 100%)" },
+        neonCyber:  { name: "Neon Cyber", court: "#0d0e15", lines: "#00f0ff", bodyBg: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" },
+        matrixNet:  { name: "The Matrix", court: "#000000", lines: "#00FF00", bodyBg: "linear-gradient(180deg, #001100 0%, #000000 100%)" },
         royalCourt: { name: "Royal Arena", court: "#1a252f", lines: "#f1c40f", bodyBg: "linear-gradient(135deg, #b89742 0%, #efd07b 50%, #b89742 100%)" },
-        ironCourt:  { name: "Stark Lab Arena", court: "#b71c1c", lines: "#ffd700", bodyBg: "radial-gradient(circle, #424242 0%, #212121 100%)" }
+        ironCourt:  { name: "Stark Lab Arena", court: "#b71c1c", lines: "#ffd700", bodyBg: "radial-gradient(circle, #424242 0%, #212121 100%)" },
+        vaporwave:  { name: "Vapor Wave", court: "#ff71ce", lines: "#01cdfe", bodyBg: "linear-gradient(180deg, #0575e6 0%, #00f260 100%)" },
+        frostCourt: { name: "Frozen Frost", court: "#e0f7fa", lines: "#00b0ff", bodyBg: "radial-gradient(circle, #b2ebf2 0%, #006064 100%)" },
+        camoCourt:  { name: "Midnight Camo", court: "#2e7d32", lines: "#81c784", bodyBg: "linear-gradient(135deg, #1b5e20 0%, #000000 100%)" },
+        lavaCourt:  { name: "Volcano Core", court: "#212121", lines: "#ff3d00", bodyBg: "radial-gradient(circle, #3e2723 0%, #dd2c00 100%)" },
+        sunsetCourt:{ name: "Sunset Drive", court: "#ff6f00", lines: "#ffeb3b", bodyBg: "linear-gradient(180deg, #4a148c 0%, #ff6f00 100%)" }
     };
 
+    // 10 Custom Ball Variations
     const ballThemes = {
         orangeSpald: { name: "Spalding Orange", primary: "#d35400", seam: "black" },
-        neonPink: { name: "Cyber Punk Pink", primary: "#ff007f", seam: "#00f0ff" },
+        neonPink:    { name: "Cyber Punk Pink", primary: "#ff007f", seam: "#00f0ff" },
         matrixGreen: { name: "Digital Lime", primary: "#39ff14", seam: "#000000" },
-        solidGold: { name: "Solid Trophy Gold", primary: "#f1c40f", seam: "#ffffff" },
-        fireBall: { name: "Fireball Hoop", primary: "#ff4500", seam: "#ffcc00" },
-        ironBall: { name: "Mark Armor Ball", primary: "#990000", seam: "#ffd700" }
+        solidGold:   { name: "Solid Trophy Gold", primary: "#f1c40f", seam: "#ffffff" },
+        fireBall:    { name: "Fireball Hoop", primary: "#ff4500", seam: "#ffcc00" },
+        ironBall:    { name: "Mark Armor Ball", primary: "#990000", seam: "#ffd700" },
+        plasmaGlow:  { name: "Plasma Nebula", primary: "#651fff", seam: "#00e5ff" },
+        stealthBall: { name: "Emerald Stealth", primary: "#004d40", seam: "#00e676" },
+        gumBall:     { name: "Bubblegum Pop", primary: "#ff4081", seam: "#ffffff" },
+        cosmicBall:  { name: "Star Dust Cosmic", primary: "#311b92", seam: "#ea80fc" }
     };
 
+    // 10 Different Barrier Towers
     const pillarThemes = {
-        slateGray: { name: "Standard Slate", fill: "#34495e", rim: "#e74c3c" },
-        cyberGrid: { name: "Neon Grid Tower", fill: "#1f1f2e", rim: "#00f0ff" },
-        toxicWaste: { name: "Toxic Barrel", fill: "#1a3a1a", rim: "#39ff14" },
-        gildedBars: { name: "Gilded Gold Bars", fill: "#7f6000", rim: "#f1c40f" },
-        ironPillar: { name: "Arc Reactor Tower", fill: "#ffd700", rim: "#b71c1c" }
+        slateGray:   { name: "Standard Slate", fill: "#34495e", rim: "#e74c3c" },
+        cyberGrid:   { name: "Neon Grid Tower", fill: "#1f1f2e", rim: "#00f0ff" },
+        toxicWaste:  { name: "Toxic Barrel", fill: "#1a3a1a", rim: "#39ff14" },
+        gildedBars:  { name: "Gilded Gold Bars", fill: "#7f6000", rim: "#f1c40f" },
+        ironPillar:  { name: "Arc Reactor Tower", fill: "#ffd700", rim: "#b71c1c" },
+        amethyst:    { name: "Amethyst Crystal", fill: "#4a148c", rim: "#e040fb" },
+        laserTower:  { name: "Laser Security", fill: "#212121", rim: "#ff1744" },
+        industrial:  { name: "Steel Girder", fill: "#78909c", rim: "#37474f" },
+        bamboo:      { name: "Bamboo Stalk", fill: "#33691e", rim: "#aeed50" },
+        deepOcean:   { name: "Abyssal Trench", fill: "#0d47a1", rim: "#29b6f6" }
     };
     
     let purchasedCourts = JSON.parse(localStorage.getItem('purchasedCourts')) || ['classicWood'];
@@ -208,7 +220,6 @@
         document.documentElement.style.setProperty('--primary', ball.primary);
     }
 
-    // Dynamic cost calculator: Starts at 150 coins, each added purchase increases by 50
     function getThemeCost(key, tab) {
         if (key === 'classicWood' || key === 'orangeSpald' || key === 'slateGray') return 0;
         let ownedCount = 0;
