@@ -17,10 +17,27 @@
             margin: 0; padding: 0; overflow: hidden; 
             background: var(--body-bg); 
             font-family: 'Segoe UI', sans-serif; touch-action: none; 
-            position: fixed; width: 100%; height: 100%; 
+            position: fixed; width: 100vw !important; height: 100vh !important; 
         }
-        #app-container { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        canvas { display: block; max-width: 100%; max-height: 100vh; margin: 0 auto; z-index: 1; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        #app-container { 
+            position: relative; 
+            width: 100vw !important; 
+            height: 100vh !important; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        canvas { 
+            display: block; 
+            width: 100vw !important; 
+            height: 100vh !important; 
+            max-width: 100% !important; 
+            max-height: 100% !important;
+            margin: 0 auto; 
+            z-index: 1; 
+            box-shadow: 0 0 50px rgba(0,0,0,0.5); 
+            object-fit: contain;
+        }
         
         .overlay { position: absolute; background: white; padding: 25px; border-radius: 25px; text-align: center; display: none; flex-direction: column; width: 85%; max-width: 320px; z-index: 10; border: 4px solid var(--primary); box-shadow: 0 15px 40px rgba(0,0,0,0.4); box-sizing: border-box; }
         #login-screen { display: flex; }
@@ -41,7 +58,6 @@
         
         #hud { position: absolute; top: env(safe-area-inset-top, 20px); width: 90%; display: flex; justify-content: space-between; color: white; font-weight: bold; pointer-events: none; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); z-index: 5; font-size: 18px; }
         
-        /* Expanded Shop Layout with 3 Tabs */
         .shop-tabs { display: flex; gap: 4px; margin-top: 10px; }
         .tab-btn { flex: 1; padding: 8px 4px; font-size: 11px; background: #eee; color: #333; border-radius: 8px; white-space: nowrap; }
         .tab-btn.active { background: #3498db; color: white; }
@@ -54,11 +70,13 @@
         .item-cost { font-size: 12px; color: #7f8c8d; }
         .btn-buy { padding: 6px 12px; font-size: 12px; margin-top: 0; }
 
-        /* Simulated Ad Player Screen */
-        #ad-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; }
+        #ad-container { position: absolute; top: 0; left: 0; width: 100vw !important; height: 100vh !important; background: rgba(0,0,0,0.95); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; }
         .ad-box { width: 80%; max-width: 400px; height: 250px; background: #333; border: 2px dashed #666; display: flex; align-items: center; justify-content: center; border-radius: 15px; margin-bottom: 20px; font-size: 24px; color: #aaa; position: relative; overflow: hidden; }
         .ad-progress { position: absolute; bottom: 0; left: 0; height: 6px; background: #e74c3c; width: 0%; }
     </style>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -81,7 +99,8 @@
         <h2 id="menuTitle" style="margin-top:0; color:#c0392b;">OUT OF BOUNDS!</h2>
         
         <div class="leaderboard-list" id="leaderboardContainer">
-            <strong>TOP 5 LEADERBOARD</strong>
+            <strong>GLOBAL TOP 5 LEADERBOARD</strong>
+            <div style="text-align:center; padding-top:10px; color:#aaa;">Loading scores...</div>
         </div>
 
         <p style="font-size: 15px; margin: 5px 0;">Your Run: <strong><span id="lastScore">0</span></strong></p>
@@ -103,9 +122,7 @@
             <button id="tabPillars" class="tab-btn" onclick="switchShopTab('pillars')">🚧 PILLARS</button>
         </div>
         
-        <div class="shop-grid" id="shopGrid">
-            </div>
-        
+        <div class="shop-grid" id="shopGrid"></div>
         <button class="btn-exit" onclick="closeShop()">CLOSE SHOP</button>
     </div>
 
@@ -120,6 +137,22 @@
 </div>
 
 <script>
+    // --- FIREBASE INTEGRATION SETUP ---
+    // PASTE YOUR COPIED FIREBASE CONFIG VALUES BELOW:
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_AUTH_DOMAIN",
+        databaseURL: "YOUR_DATABASE_URL",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Firebase Engine
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
@@ -134,7 +167,6 @@
     let player = { x: 60, y: 0, radius: 18, v: 0, g: 0.45, jump: -7.5 };
     let obstacles = [], coinItems = [];
 
-    // --- 1. Separated Cosmetics Databases (Costs dynamically assigned now) ---
     const courtThemes = {
         classicWood: { name: "Classic Wood", court: "#e67e22", lines: "rgba(255,255,255,0.5)", bodyBg: "radial-gradient(circle, #34495e 0%, #2c3e50 100%)" },
         neonCyber: { name: "Neon Cyber", court: "#0d0e15", lines: "#00f0ff", bodyBg: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" },
@@ -156,19 +188,17 @@
         gildedBars: { name: "Gilded Gold Bars", fill: "#7f6000", rim: "#f1c40f" }
     };
     
-    // 2. Independent Inventory Lists 
     let purchasedCourts = JSON.parse(localStorage.getItem('purchasedCourts')) || ['classicWood'];
     let purchasedBalls = JSON.parse(localStorage.getItem('purchasedBalls')) || ['orangeSpald'];
     let purchasedPillars = JSON.parse(localStorage.getItem('purchasedPillars')) || ['slateGray'];
     
-    // 3. Active Custom Selections
     let activeCourtKey = localStorage.getItem('activeCourtKey') || 'classicWood';
     let activeBallKey = localStorage.getItem('activeBallKey') || 'orangeSpald';
     let activePillarKey = localStorage.getItem('activePillarKey') || 'slateGray';
 
     function init() {
-        canvas.height = window.innerHeight;
-        canvas.width = Math.min(window.innerWidth, canvas.height * 0.6);
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
         applyThemeStyles();
         
         if (nickname) {
@@ -179,9 +209,14 @@
             document.getElementById('btnReviveAd').style.display = 'none';
         }
         updateHUD(); 
-        displayLeaderboard();
+        displayGlobalLeaderboard();
         checkAdLimit();
         render();
+    }
+
+    function resizeCanvas() {
+        canvas.height = window.innerHeight;
+        canvas.width = Math.min(window.innerWidth, canvas.height * 0.6);
     }
 
     function saveNickname() {
@@ -209,7 +244,6 @@
         document.documentElement.style.setProperty('--primary', ball.primary);
     }
 
-    // --- Daily Ad Tracking Check ---
     function getAdCountForToday() {
         const today = new Date().toDateString();
         const savedDate = localStorage.getItem('adTrackerDate');
@@ -240,22 +274,16 @@
         }
     }
 
-    // --- Dynamic Formula Shopping Engine ---
     function getThemeCost(key, tab) {
-        // Default items cost 0
         if (key === 'classicWood' || key === 'orangeSpald' || key === 'slateGray') return 0;
-        
         let ownedCount = 0;
         if (tab === 'courts') {
-            // Count purchased premium courts (excluding default classicWood)
             ownedCount = purchasedCourts.filter(k => k !== 'classicWood').length;
         } else if (tab === 'balls') {
             ownedCount = purchasedBalls.filter(k => k !== 'orangeSpald').length;
         } else {
             ownedCount = purchasedPillars.filter(k => k !== 'slateGray').length;
         }
-        
-        // Starts at 500 and scales up by 150 per purchased item in that collection
         return 500 + (ownedCount * 150);
     }
 
@@ -268,7 +296,6 @@
 
     function switchShopTab(tab) {
         currentShopTab = tab;
-        
         document.getElementById('tabCourts').classList.toggle('active', tab === 'courts');
         document.getElementById('tabBalls').classList.toggle('active', tab === 'balls');
         document.getElementById('tabPillars').classList.toggle('active', tab === 'pillars');
@@ -314,11 +341,9 @@
 
     function buyItem(key, tab) {
         const cost = getThemeCost(key, tab);
-        
         if (coins >= cost) {
             coins -= cost;
             localStorage.setItem('coins', coins);
-            
             if (tab === 'courts') {
                 purchasedCourts.push(key);
                 localStorage.setItem('purchasedCourts', JSON.stringify(purchasedCourts));
@@ -329,7 +354,6 @@
                 purchasedPillars.push(key);
                 localStorage.setItem('purchasedPillars', JSON.stringify(purchasedPillars));
             }
-            
             equipItem(key, tab);
         } else {
             alert("Not enough coins! Watch an ad to get some free coins.");
@@ -356,13 +380,11 @@
         document.getElementById('menu').style.display = 'flex';
     }
 
-    // --- Mock Ad Mechanism Engine ---
     function watchAd(type) {
         if (type === 'coins' && getAdCountForToday() >= 10) {
             alert("Daily free coin limits reached! Come back tomorrow.");
             return;
         }
-
         currentAdAction = type;
         document.getElementById('menu').style.display = 'none';
         document.getElementById('ad-container').style.display = 'flex';
@@ -370,7 +392,6 @@
         let timeLeft = 5;
         const progressBar = document.getElementById('adBar');
         const adContent = document.getElementById('adContent');
-        
         const contentSamples = ["👟 Slam-Dunk Premium Gear", "🥤 Ultra-Hydration Fuel", "🎮 Pixel Court Arena Showcase"];
         adContent.innerText = `🎥 Playing: ${contentSamples[Math.floor(Math.random() * contentSamples.length)]}`;
         
@@ -402,7 +423,7 @@
             obstacles = obstacles.filter(o => o.x > player.x + 150 || o.x < player.x - 100);
             document.getElementById('menu').style.display = 'none';
         } else if (currentAdAction === 'coins') {
-            coins += 10; // Changed from 25 to 10
+            coins += 10;
             localStorage.setItem('coins', coins);
             incrementAdCount();
             updateHUD();
@@ -411,26 +432,47 @@
         currentAdAction = null;
     }
 
-    // --- Core Game Loops ---
-    function displayLeaderboard() {
-        const leaderboard = JSON.parse(localStorage.getItem('bballLeaderboard')) || [];
+    // --- Global Realtime Database Leaderboard Logic ---
+    function displayGlobalLeaderboard() {
         const boardContainer = document.getElementById('leaderboardContainer');
-        let html = `<strong>TOP 5 LEADERBOARD</strong>`;
         
-        if (leaderboard.length === 0) {
-            html += `<div class="score-entry" style="justify-content: center; color: #aaa; margin-top: 15px;">No records yet!</div>`;
-        } else {
-            leaderboard.forEach((entry, index) => {
-                const isCurrentRun = (!gameActive && score > 0 && entry.score === score && entry.name === nickname);
-                const highlightStyle = isCurrentRun ? 'color: var(--primary); font-weight: bold; background: #fdf2e9;' : '';
-                html += `
-                    <div class="score-entry" style="${highlightStyle} padding: 4px 2px;">
-                        <span>${index + 1}. ${entry.name.toUpperCase()}</span>
-                        <span>${entry.score} pts</span>
-                    </div>`;
+        db.ref('leaderboard').orderByChild('score').limitToLast(5).on('value', (snapshot) => {
+            let html = `<strong>GLOBAL TOP 5 LEADERBOARD</strong>`;
+            let elements = [];
+            
+            snapshot.forEach((childSnapshot) => {
+                elements.push(childSnapshot.val());
             });
-        }
-        boardContainer.innerHTML = html;
+            
+            elements.reverse();
+            
+            if (elements.length === 0) {
+                html += `<div class="score-entry" style="justify-content: center; color: #aaa; margin-top: 15px;">No global records yet!</div>`;
+            } else {
+                elements.forEach((entry, index) => {
+                    const isCurrentPlayer = (entry.name.toLowerCase() === nickname.toLowerCase());
+                    const highlightStyle = isCurrentPlayer ? 'color: var(--primary); font-weight: bold; background: #fdf2e9;' : '';
+                    html += `
+                        <div class="score-entry" style="${highlightStyle} padding: 4px 2px;">
+                            <span>${index + 1}. ${entry.name.toUpperCase()}</span>
+                            <span>${entry.score} pts</span>
+                        </div>`;
+                });
+            }
+            boardContainer.innerHTML = html;
+        }, (error) => {
+            boardContainer.innerHTML = `<strong>GLOBAL TOP 5 LEADERBOARD</strong><div style="color:red; font-size:11px;">Error connection backend.</div>`;
+        });
+    }
+
+    function sendScoreToFirebase(playerNick, playerFinalScore) {
+        if (!playerNick || playerFinalScore <= 0) return;
+        
+        db.ref('leaderboard').push({
+            name: playerNick,
+            score: playerFinalScore,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
     }
 
     function startGame() {
@@ -446,34 +488,27 @@
         if(gameActive && e.target.tagName !== 'BUTTON') { e.preventDefault(); jump(); } 
     }, {passive: false});
 
-    // --- Full Court Blueprint Drawing ---
     function drawCourt() {
         const courtStyle = courtThemes[activeCourtKey];
         ctx.fillStyle = courtStyle.court;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
         ctx.strokeStyle = courtStyle.lines;
         ctx.lineWidth = 3;
         
-        // Outer Boundary
         ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
         
-        // Center Line Layout
         ctx.beginPath();
         ctx.moveTo(5, canvas.height / 2);
         ctx.lineTo(canvas.width - 5, canvas.height / 2);
         ctx.stroke();
         
-        // Center Restraining Circles
         ctx.beginPath();
         ctx.arc(canvas.width / 2, canvas.height / 2, 40, 0, Math.PI * 2);
         ctx.stroke();
-        
         ctx.beginPath();
         ctx.arc(canvas.width / 2, canvas.height / 2, 15, 0, Math.PI * 2);
         ctx.stroke();
         
-        // Bottom Paint Area & Key
         ctx.fillStyle = "rgba(255,255,255,0.02)";
         ctx.fillRect(canvas.width / 4, canvas.height - 140, canvas.width / 2, 135);
         ctx.strokeRect(canvas.width / 4, canvas.height - 140, canvas.width / 2, 135);
@@ -481,14 +516,12 @@
         ctx.arc(canvas.width / 2, canvas.height - 140, 45, Math.PI, 0);
         ctx.stroke();
         
-        // Top Paint Area & Key
         ctx.fillRect(canvas.width / 4, 5, canvas.width / 2, 135);
         ctx.strokeRect(canvas.width / 4, 5, canvas.width / 2, 135);
         ctx.beginPath();
         ctx.arc(canvas.width / 2, 140, 45, 0, Math.PI);
         ctx.stroke();
         
-        // 3-Point Arcs (Subtle Layout Indicators)
         ctx.beginPath();
         ctx.arc(canvas.width / 2, 5, canvas.width * 0.45, 0, Math.PI);
         ctx.stroke();
@@ -504,7 +537,7 @@
 
         if (frame % 100 === 0) {
             obstacleCount++;
-            let gap = 200, h = Math.random() * (canvas.height - gap - 280) + 140; // Clamped tightly to look clean inside a full court
+            let gap = 200, h = Math.random() * (canvas.height - gap - 280) + 140;
             obstacles.push({ x: canvas.width, h: h, gap: gap, passed: false, id: obstacleCount });
             coinItems.push({ x: canvas.width + 15, y: h + (gap/2), collected: false });
         }
@@ -536,13 +569,10 @@
         const ballConfig = ballThemes[activeBallKey];
         const pillarConfig = pillarThemes[activePillarKey];
         
-        // Draw custom themed Pillars
         obstacles.forEach(o => {
             ctx.fillStyle = pillarConfig.fill;
             ctx.fillRect(o.x, 0, 50, o.h);
             ctx.fillRect(o.x, o.h + o.gap, 50, canvas.height);
-            
-            // Draw rim stripes using selected configuration parameters
             ctx.strokeStyle = pillarConfig.rim;
             ctx.lineWidth = 5;
             ctx.beginPath(); ctx.moveTo(o.x - 10, o.h); ctx.lineTo(o.x + 60, o.h); ctx.stroke();
@@ -555,10 +585,8 @@
         ctx.fillStyle = "var(--gold)";
         coinItems.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, 9, 0, Math.PI*2); ctx.fill(); });
         
-        // Render custom customized ball skin mesh assets
         ctx.fillStyle = ballConfig.primary;
         ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.fill();
-        
         ctx.strokeStyle = ballConfig.seam; 
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(player.x - player.radius, player.y); ctx.lineTo(player.x + player.radius, player.y); ctx.stroke();
@@ -571,11 +599,7 @@
     function endGame() {
         gameActive = false;
         
-        let leaderboard = JSON.parse(localStorage.getItem('bballLeaderboard')) || [];
-        leaderboard.push({ name: nickname || "Player", score: score });
-        leaderboard.sort((a, b) => b.score - a.score);
-        leaderboard = leaderboard.slice(0, 5);
-        localStorage.setItem('bballLeaderboard', JSON.stringify(leaderboard));
+        sendScoreToFirebase(nickname || "Player", score);
         
         if (score > highScore) { 
             highScore = score; 
@@ -583,7 +607,6 @@
         }
         
         document.getElementById('lastScore').innerText = score;
-        displayLeaderboard();
         checkAdLimit();
         
         const reviveBtn = document.getElementById('btnReviveAd');
