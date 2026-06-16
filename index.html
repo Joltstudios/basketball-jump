@@ -49,12 +49,8 @@
         
         .btn-start { background: var(--primary); color: white; }
         .btn-restart { background: #2ecc71; color: white; }
-        .btn-ad { background: #9b59b6; color: white; }
         .btn-shop { background: #3498db; color: white; }
         .btn-exit { background: #95a5a6; color: white; }
-        
-        .leaderboard-list { text-align: left; margin: 10px 0; font-size: 13px; background: #f9f9f9; padding: 10px; border-radius: 10px; min-height: 90px; border: 1px solid #eee; }
-        .score-entry { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 4px 2px; }
         
         #hud { position: absolute; top: env(safe-area-inset-top, 20px); width: 90%; display: flex; justify-content: space-between; color: white; font-weight: bold; pointer-events: none; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); z-index: 5; font-size: 18px; }
         
@@ -69,14 +65,7 @@
         .item-name { font-weight: bold; font-size: 14px; }
         .item-cost { font-size: 12px; color: #7f8c8d; }
         .btn-buy { padding: 6px 12px; font-size: 12px; margin-top: 0; }
-
-        #ad-container { position: absolute; top: 0; left: 0; width: 100vw !important; height: 100vh !important; background: rgba(0,0,0,0.95); z-index: 100; display: none; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; }
-        .ad-box { width: 80%; max-width: 400px; height: 250px; background: #333; border: 2px dashed #666; display: flex; align-items: center; justify-content: center; border-radius: 15px; margin-bottom: 20px; font-size: 24px; color: #aaa; position: relative; overflow: hidden; }
-        .ad-progress { position: absolute; bottom: 0; left: 0; height: 6px; background: #e74c3c; width: 0%; }
     </style>
-
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -97,18 +86,10 @@
 
     <div id="menu" class="overlay">
         <h2 id="menuTitle" style="margin-top:0; color:#c0392b;">OUT OF BOUNDS!</h2>
-        
-        <div class="leaderboard-list" id="leaderboardContainer">
-            <strong>GLOBAL TOP 5 LEADERBOARD</strong>
-            <div style="text-align:center; padding-top:10px; color:#aaa;">Loading scores...</div>
-        </div>
-
         <p style="font-size: 15px; margin: 5px 0;">Your Run: <strong><span id="lastScore">0</span></strong></p>
         
         <button class="btn-restart" onclick="startGame()">REPLAY</button>
-        <button class="btn-ad" id="btnReviveAd" onclick="watchAd('revive')">📺 REVIVE RUN</button>
         <button class="btn-shop" onclick="openShop()">🛒 THEME SHOP</button>
-        <button class="btn-ad" id="btnFreeCoins" onclick="watchAd('coins')">📺 FREE COINS (+10)</button>
         <button class="btn-exit" onclick="fullExit()">EXIT TO MAIN</button>
     </div>
 
@@ -125,51 +106,16 @@
         <div class="shop-grid" id="shopGrid"></div>
         <button class="btn-exit" onclick="closeShop()">CLOSE SHOP</button>
     </div>
-
-    <div id="ad-container">
-        <h3 style="margin: 0 0 10px 0; letter-spacing: 1px;">SPONSORED ADVERTISEMENT</h3>
-        <div class="ad-box">
-            <span id="adContent">🎥 Commercial Playing...</span>
-            <div class="ad-progress" id="adBar"></div>
-        </div>
-        <p id="adTimer">Reward arrives in 5 seconds...</p>
-    </div>
 </div>
 
 <script>
-    // --- FIREBASE INTEGRATION SETUP ---
-    const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_AUTH_DOMAIN",
-        databaseURL: "YOUR_DATABASE_URL",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_STORAGE_BUCKET",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID"
-    };
-
-    // Safe Engine Loader (Prevents blank freeze if API keys are missing)
-    let db = null;
-    let isFirebaseReady = false;
-    if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.database();
-            isFirebaseReady = true;
-        } catch(e) {
-            console.error("Firebase init failed:", e);
-        }
-    }
-
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
     let nickname = localStorage.getItem('playerNick') || "";
-    let coins = parseInt(localStorage.getItem('coins')) || 0;
+    let coins = parseInt(localStorage.getItem('coins')) || 150; // Starting theme coins raised to 150
     let highScore = localStorage.getItem('bestScore') || 0;
     let gameActive = false, score = 0, frame = 0, obstacleCount = 0;
-    let hasRevivedThisRun = false;
-    let currentAdAction = null;
     let currentShopTab = 'courts'; 
 
     let player = { x: 60, y: 0, radius: 18, v: 0, g: 0.45, jump: -7.5 };
@@ -177,6 +123,7 @@
 
     const courtThemes = {
         classicWood: { name: "Classic Wood", court: "#e67e22", lines: "rgba(255,255,255,0.5)", bodyBg: "radial-gradient(circle, #34495e 0%, #2c3e50 100%)" },
+        ironManCourt: { name: "Stark Tech Court", court: "#7a0010", lines: "#00f0ff", bodyBg: "linear-gradient(135deg, #110002 0%, #4a000a 100%)" },
         neonCyber: { name: "Neon Cyber", court: "#0d0e15", lines: "#00f0ff", bodyBg: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" },
         matrixNet: { name: "The Matrix", court: "#000000", lines: "#00FF00", bodyBg: "linear-gradient(180deg, #001100 0%, #000000 100%)" },
         royalCourt: { name: "Royal Arena", court: "#1a252f", lines: "#f1c40f", bodyBg: "linear-gradient(135deg, #b89742 0%, #efd07b 50%, #b89742 100%)" }
@@ -184,6 +131,8 @@
 
     const ballThemes = {
         orangeSpald: { name: "Spalding Orange", primary: "#d35400", seam: "black" },
+        fireballBasketball: { name: "Fireball Hoop", primary: "#ff4500", seam: "#ffcc00", special: "fire" },
+        ironManBall: { name: "Mark Hot-Rod Red", primary: "#b30006", seam: "#ffd700" },
         neonPink: { name: "Cyber Punk Pink", primary: "#ff007f", seam: "#00f0ff" },
         matrixGreen: { name: "Digital Lime", primary: "#39ff14", seam: "#000000" },
         solidGold: { name: "Solid Trophy Gold", primary: "#f1c40f", seam: "#ffffff" }
@@ -191,6 +140,7 @@
 
     const pillarThemes = {
         slateGray: { name: "Standard Slate", fill: "#34495e", rim: "#e74c3c" },
+        ironManPillar: { name: "Titanium Avengers Core", fill: "#ffd700", rim: "#00f0ff" },
         cyberGrid: { name: "Neon Grid Tower", fill: "#1f1f2e", rim: "#00f0ff" },
         toxicWaste: { name: "Toxic Barrel", fill: "#1a3a1a", rim: "#39ff14" },
         gildedBars: { name: "Gilded Gold Bars", fill: "#7f6000", rim: "#f1c40f" }
@@ -214,11 +164,8 @@
             document.getElementById('menu').style.display = 'flex';
             document.getElementById('playerDisplay').innerText = nickname.toUpperCase();
             document.getElementById('menuTitle').innerText = "READY TO JUMP?";
-            document.getElementById('btnReviveAd').style.display = 'none';
         }
         updateHUD(); 
-        displayGlobalLeaderboard();
-        checkAdLimit();
         render();
     }
 
@@ -250,36 +197,6 @@
         const ball = ballThemes[activeBallKey];
         document.documentElement.style.setProperty('--body-bg', court.bodyBg);
         document.documentElement.style.setProperty('--primary', ball.primary);
-    }
-
-    function getAdCountForToday() {
-        const today = new Date().toDateString();
-        const savedDate = localStorage.getItem('adTrackerDate');
-        
-        if (savedDate !== today) {
-            localStorage.setItem('adTrackerDate', today);
-            localStorage.setItem('adCountToday', '0');
-            return 0;
-        }
-        return parseInt(localStorage.getItem('adCountToday')) || 0;
-    }
-
-    function incrementAdCount() {
-        const currentCount = getAdCountForToday();
-        localStorage.setItem('adCountToday', (currentCount + 1).toString());
-        checkAdLimit();
-    }
-
-    function checkAdLimit() {
-        const btn = document.getElementById('btnFreeCoins');
-        const count = getAdCountForToday();
-        if (count >= 10) {
-            btn.disabled = true;
-            btn.innerText = "📺 FREE COINS (MAXED)";
-        } else {
-            btn.disabled = false;
-            btn.innerText = `📺 FREE COINS (+10) [${count}/10]`;
-        }
     }
 
     function getThemeCost(key, tab) {
@@ -364,7 +281,7 @@
             }
             equipItem(key, tab);
         } else {
-            alert("Not enough coins! Watch an ad to get some free coins.");
+            alert("Not enough coins to purchase this customization theme skin!");
         }
     }
 
@@ -388,109 +305,9 @@
         document.getElementById('menu').style.display = 'flex';
     }
 
-    function watchAd(type) {
-        if (type === 'coins' && getAdCountForToday() >= 10) {
-            alert("Daily free coin limits reached! Come back tomorrow.");
-            return;
-        }
-        currentAdAction = type;
-        document.getElementById('menu').style.display = 'none';
-        document.getElementById('ad-container').style.display = 'flex';
-        
-        let timeLeft = 5;
-        const progressBar = document.getElementById('adBar');
-        const adContent = document.getElementById('adContent');
-        const contentSamples = ["👟 Slam-Dunk Premium Gear", "🥤 Ultra-Hydration Fuel", "🎮 Pixel Court Arena Showcase"];
-        adContent.innerText = `🎥 Playing: ${contentSamples[Math.floor(Math.random() * contentSamples.length)]}`;
-        
-        progressBar.style.transition = 'none';
-        progressBar.style.width = '0%';
-        setTimeout(() => {
-            progressBar.style.transition = 'width 5s linear';
-            progressBar.style.width = '100%';
-        }, 50);
-
-        const countdown = setInterval(() => {
-            timeLeft--;
-            if (timeLeft <= 0) {
-                clearInterval(countdown);
-                rewardUser();
-            }
-        }, 1000);
-    }
-
-    function rewardUser() {
-        document.getElementById('ad-container').style.display = 'none';
-        document.getElementById('menu').style.display = 'flex';
-        
-        if (currentAdAction === 'revive') {
-            hasRevivedThisRun = true;
-            gameActive = true;
-            player.y = canvas.height / 2;
-            player.v = 0;
-            obstacles = obstacles.filter(o => o.x > player.x + 150 || o.x < player.x - 100);
-            document.getElementById('menu').style.display = 'none';
-        } else if (currentAdAction === 'coins') {
-            coins += 10;
-            localStorage.setItem('coins', coins);
-            incrementAdCount();
-            updateHUD();
-            alert("Reward Granted! 💰 +10 Coins added!");
-        }
-        currentAdAction = null;
-    }
-
-    function displayGlobalLeaderboard() {
-        const boardContainer = document.getElementById('leaderboardContainer');
-        if (!isFirebaseReady) {
-            boardContainer.innerHTML = `<strong>GLOBAL TOP 5 LEADERBOARD</strong><div style="text-align:center; padding-top:10px; color:#aaa;">Local Practice Mode (Database Offline)</div>`;
-            return;
-        }
-        
-        db.ref('leaderboard').orderByChild('score').limitToLast(5).on('value', (snapshot) => {
-            let html = `<strong>GLOBAL TOP 5 LEADERBOARD</strong>`;
-            let elements = [];
-            
-            snapshot.forEach((childSnapshot) => {
-                elements.push(childSnapshot.val());
-            });
-            
-            elements.reverse();
-            
-            if (elements.length === 0) {
-                html += `<div class="score-entry" style="justify-content: center; color: #aaa; margin-top: 15px;">No global records yet!</div>`;
-            } else {
-                elements.forEach((entry, index) => {
-                    const isCurrentPlayer = (nickname && entry.name && entry.name.toLowerCase() === nickname.toLowerCase());
-                    const highlightStyle = isCurrentPlayer ? 'color: var(--primary); font-weight: bold; background: #fdf2e9;' : '';
-                    html += `
-                        <div class="score-entry" style="${highlightStyle} padding: 4px 2px;">
-                            <span>${index + 1}. ${String(entry.name).toUpperCase()}</span>
-                            <span>${entry.score} pts</span>
-                        </div>`;
-                });
-            }
-            boardContainer.innerHTML = html;
-        }, (error) => {
-            boardContainer.innerHTML = `<strong>GLOBAL TOP 5 LEADERBOARD</strong><div style="color:red; font-size:11px;">Error connecting to backend.</div>`;
-        });
-    }
-
-    function sendScoreToFirebase(playerNick, playerFinalScore) {
-        if (!isFirebaseReady || !playerNick || playerFinalScore <= 0) return;
-        
-        // Single separate push request so it does not trigger circular listener exceptions
-        db.ref('leaderboard').push({
-            name: playerNick,
-            score: playerFinalScore,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
-        });
-    }
-
     function startGame() {
         score = 0; obstacleCount = 0; player.y = canvas.height / 2; player.v = 0;
         obstacles = []; coinItems = []; frame = 0; gameActive = true;
-        hasRevivedThisRun = false; 
         document.getElementById('menu').style.display = 'none';
     }
 
@@ -597,6 +414,18 @@
         ctx.fillStyle = "var(--gold)";
         coinItems.forEach(c => { ctx.beginPath(); ctx.arc(c.x, c.y, 9, 0, Math.PI*2); ctx.fill(); });
         
+        // Render Fireball Aura effect if equipped
+        if (ballConfig.special === "fire") {
+            for (let idx = 0; idx < 6; idx++) {
+                ctx.beginPath();
+                ctx.fillStyle = idx % 2 === 0 ? "rgba(255, 69, 0, 0.35)" : "rgba(255, 165, 0, 0.2)";
+                let offsetOffsetX = (Math.random() - 0.7) * 22;
+                let offsetOffsetY = (Math.random() - 0.5) * 12;
+                ctx.arc(player.x + offsetOffsetX, player.y + offsetOffsetY, player.radius * (1 + Math.random() * 0.4), 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
         ctx.fillStyle = ballConfig.primary;
         ctx.beginPath(); ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = ballConfig.seam; 
@@ -611,23 +440,12 @@
     function endGame() {
         gameActive = false;
         
-        sendScoreToFirebase(nickname || "Player", score);
-        
         if (score > highScore) { 
             highScore = score; 
             localStorage.setItem('bestScore', highScore); 
         }
         
         document.getElementById('lastScore').innerText = score;
-        checkAdLimit();
-        
-        const reviveBtn = document.getElementById('btnReviveAd');
-        if (!hasRevivedThisRun && score > 0) {
-            reviveBtn.style.display = 'flex';
-        } else {
-            reviveBtn.style.display = 'none';
-        }
-        
         document.getElementById('menuTitle').innerText = "OUT OF BOUNDS!";
         document.getElementById('menu').style.display = 'flex';
     }
